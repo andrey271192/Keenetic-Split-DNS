@@ -1,18 +1,28 @@
-# Keenetic-Split-DNS
+# Keenetic Split DNS
 
-Split-DNS для роутеров **Keenetic** с **Entware**: домены Yandex, VK, Mail.ru, OK и др. резолвятся через выбранный **DNS-over-TLS** upstream (например Yandex `77.88.8.8:853`), остальной трафик — через DNS провайдера / Keenetic.
+На Keenetic в настройках DNS можно включить **DNS-over-TLS** — но только **один сервер на всё**. Нельзя сказать роутеру: «для `vk.com` — Яндекс DoT, для остального — как у провайдера». Этот проект как раз про такую «раздельную» DNS-политику.
 
-Веб-интерфейс на русском, порт **3200**, только LAN.
+**Keenetic Split DNS** — веб-панель и скрипты для роутера с **Entware**: списки доменов (Яндекс, VK, Mail.ru, OK и др.) резолвятся через выбранный **DoT** upstream, всё остальное — через обычный DNS Keenetic/провайдера. Интерфейс на русском, порт **3200**, доступ только из LAN.
 
-## Быстрая установка
+![Обзор веб-интерфейса](docs/images/overview.png)
+
+## Кому подойдёт
+
+- Роутер **Keenetic** с установленным **Entware** (USB-накопитель).
+- Вы уже пользуетесь или планируете **[HydraRoute Neo](https://github.com/Ground-Zerro/HydraRoute/tree/main/Neo)** — маршрутизация по IP из DNS; Split DNS подставляет «правильный» резолв для RU-сервисов.
+- Нужно, чтобы VK/Mail/OK/Yandex шли через **Яндекс DoT** (`77.88.8.8:853`), а не через один глобальный DoT в прошивке.
+
+## Установка и удаление
+
+Одна команда — скачивает репозиторий, ставит пакеты Entware (`smartdns`, `lighttpd`, …), поднимает сервисы:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/andrey271192/Keenetic-Split-DNS/main/install.sh | sh
 ```
 
-После установки откройте `http://<LAN_IP>:3200` (токен API выводится в консоль).
+После установки откройте в браузере **`http://<IP_роутера_в_LAN>:3200`**. Токен для входа покажут в консоли (файл `/opt/etc/keenetic-split-dns/token`).
 
-## Удаление
+Удаление:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/andrey271192/Keenetic-Split-DNS/main/uninstall.sh | sh
@@ -24,89 +34,50 @@ curl -fsSL https://raw.githubusercontent.com/andrey271192/Keenetic-Split-DNS/mai
 curl -fsSL https://raw.githubusercontent.com/andrey271192/Keenetic-Split-DNS/main/uninstall.sh | sh -s -- --purge
 ```
 
-## Требования
+## Как это устроено (коротко)
 
-| Компонент | Описание |
-|-----------|----------|
-| Роутер Keenetic | Актуальная прошивка с Entware |
-| USB + Entware | `/opt/bin/opkg` |
-| Компоненты Keenetic | **Entware** (установка из магазина), при Neo — см. ниже |
-| Пакеты Entware | `smartdns`, `lighttpd`, `lighttpd-mod-cgi`, `ca-certificates`, `curl`, `bind-dig` (устанавливает install.sh) |
+1. Клиенты в LAN спрашивают DNS у роутера.
+2. Запросы попадают в **SmartDNS** на Entware (часто через `opkg dns-override`).
+3. Домены из списков (например `ru-services.txt`) идут на профиль **yandex-dot**; остальное — на **isp-default** (DNS Keenetic/провайдера).
+4. Правки — в **`/opt/etc/keenetic-split-dns/config.yaml`** или во вкладках веб-UI; кнопка **«Применить»** пересобирает конфиг и перезагружает SmartDNS.
 
-## Что делает установщик
+![Upstream и домены группы](docs/images/upstreams-domains.png)
 
-1. Копирует файлы в `/opt/etc/keenetic-split-dns/` и `/opt/share/keenetic-split-dns/`
-2. Создаёт `config.yaml` из примера, подставляет LAN IP (`br0`)
-3. Генерирует токен API → `/opt/etc/keenetic-split-dns/token`
-4. Собирает `smartdns.conf` из YAML (`compile-config.sh`)
-5. Включает init-скрипты `S97ksd-compile`, `S98smartdns`, `S99ksd-web`
-6. По возможности: `opkg dns-override enable` (предпочтительно для **HydraRoute Neo**)
-7. Иначе: правило `netfilter.d` для перенаправления DNS с `br0`
+Вкладки в UI: **Обзор**, **Upstream** (профиль → домены), **Домены**, **Проверка** (`dig` через локальный SmartDNS), **Настройки** (YAML и токен).
 
-## Конфигурация
+![Проверка запроса vk.com](docs/images/test-lookup.png)
 
-Основной файл:
+## Важно: глобальный DoT в Keenetic
 
-```text
-/opt/etc/keenetic-split-dns/config.yaml
-```
+В прошивке (**Интернет-фильтры → Настройка DNS**) глобальный **DNS-over-TLS** перехватывает **все** запросы и **не** умеет привязку «домен → сервер».
 
-Списки доменов:
-
-```text
-/opt/etc/keenetic-split-dns/domain-sets/ru-services.txt
-```
-
-Пересборка и применение вручную:
-
-```sh
-/opt/share/keenetic-split-dns/scripts/apply.sh
-```
-
-### Upstream по умолчанию
-
-| ID | Тип | Назначение |
-|----|-----|------------|
-| `yandex-dot` | DoT | `77.88.8.8:853`, SNI `common.dot.dns.yandex.net` |
-| `isp-default` | UDP | `auto` — DNS Keenetic / ISP |
-
-### Предзаполненные домены
-
-`yandex.ru`, `ya.ru`, `yandex.com`, `yandex.net`, `yastatic.net`, `yandex.st`, `mail.ru`, `mail.com`, `imgsmail.ru`, `mycdn.me`, `vk.com`, `vk.me`, `vkuservideo.net`, `vkuseraudio.net`, `userapi.com`, `vk-cdn.net`, `ok.ru`, `odnoklassniki.ru`, `okcdn.ru`
-
-## Веб-интерфейс
-
-| Вкладка | Функции |
-|---------|---------|
-| Обзор | Статус SmartDNS, счётчики |
-| Upstream | Master-detail: профиль → домены группы |
-| Домены | Таблица, поиск, экспорт |
-| Проверка | `dig` через локальный SmartDNS |
-| Настройки | Редактор YAML, токен, «Применить» |
-
-API (CGI): `GET/POST /api/status`, `/api/domains`, `/api/config`, `/api/reload`, `/api/test`
-
-Авторизация: заголовок `Authorization: Bearer <token>` или `X-KSD-Token`.
-
-## ⚠️ Конфликт с DoT в Keenetic
-
-В прошивке Keenetic (**Интернет-фильтры → Настройка DNS**) глобальный **DNS-over-TLS** обрабатывает **все** запросы и **не** умеет привязку «домен → сервер».
-
-**Рекомендация:** отключите глобальный DoT в UI Keenetic и используйте split-DNS этого проекта. Иначе политики SmartDNS могут не применяться к клиентам.
+**Рекомендация:** отключите глобальный DoT в UI Keenetic и настройте split-DNS здесь. Иначе политики SmartDNS могут не сработать для клиентов.
 
 ## Совместимость с HydraRoute Neo
 
-[HydraRoute Neo](https://github.com/Ground-Zerro/HydraRoute/tree/main/Neo) маршрутизирует по IP из DNS (NFLOG), а не выбирает upstream DNS.
+[HydraRoute Neo](https://github.com/Ground-Zerro/HydraRoute/tree/main/Neo) маршрутизирует по IP, полученным из DNS — сам upstream DNS не выбирает.
 
-| Правило | Действие |
-|---------|----------|
-| DHCP DNS | IP роутера в LAN (`192.168.x.1`) |
-| DNS path | Предпочтительно `opkg dns-override` → SmartDNS на Entware |
-| Глобальный DoT Keenetic | **Выключить** |
-| Порты | HRweb `2000`, Split-DNS UI `3200` — не пересекаются |
-| Проверка | После установки — диагностика в HRweb |
+| Что сделать | Зачем |
+|-------------|--------|
+| DHCP: DNS = IP роутера в LAN | Клиенты ходят в SmartDNS на Entware |
+| Предпочтительно `opkg dns-override` (делает install.sh) | Трафик DNS на `:53` → Entware |
+| **Выключить** глобальный DoT Keenetic | Не ломать split-политику |
+| Порты | HRweb `2000`, Split-DNS `3200` — не пересекаются |
 
-Установщик сохраняет состояние `dns-override` в `/opt/etc/keenetic-split-dns/dns-override.state`; `uninstall.sh` пытается восстановить прежний `dns-override.conf`.
+Установщик сохраняет состояние `dns-override` в `dns-override.state`; `uninstall.sh` пытается вернуть прежний `dns-override.conf`.
+
+## Частые вопросы
+
+**Нужен ли USB с Entware?**  
+Да. Без Entware некуда поставить SmartDNS и веб-сервер. В магазине Keenetic — компонент **Entware**.
+
+**Что если уже включён DoT в Keenetic?**  
+Лучше выключить в прошивке и пользоваться DoT только для нужных доменов через этот проект (см. выше).
+
+**Как применить правки вручную?**  
+```sh
+/opt/share/keenetic-split-dns/scripts/apply.sh
+```
 
 ## Структура репозитория
 
@@ -114,15 +85,20 @@ API (CGI): `GET/POST /api/status`, `/api/domains`, `/api/config`, `/api/reload`,
 install.sh / uninstall.sh
 scripts/          detect-lan, compile-config, apply, api
 etc/              config.yaml.example, domain-sets, lighttpd, smartdns, ndm
-www/              index.html, app.js, style.css
+www/              веб-интерфейс (порт 3200)
 cgi-bin/api.cgi
 init.d/           S97ksd-compile, S98smartdns, S99ksd-web
+docs/images/      скриншоты для README
 ```
 
 ## Лицензия
 
 MIT — см. [LICENSE](LICENSE).
 
-## Автор
+## English (short)
+
+**Keenetic Split DNS** adds split-DNS on Keenetic routers with Entware: listed domains (Yandex, VK, Mail.ru, OK, etc.) resolve via a chosen DNS-over-TLS upstream (e.g. Yandex DoT); everything else uses your ISP/Keenetic DNS. Keenetic’s built-in global DoT cannot map domains to different servers — disable it and use this stack instead. Web UI on port **3200** (LAN only). Install: `curl -fsSL https://raw.githubusercontent.com/andrey271192/Keenetic-Split-DNS/main/install.sh | sh`. Works alongside [HydraRoute Neo](https://github.com/Ground-Zerro/HydraRoute/tree/main/Neo) when clients use the router as DNS and `dns-override` points to SmartDNS.
+
+---
 
 [andrey271192](https://github.com/andrey271192)
