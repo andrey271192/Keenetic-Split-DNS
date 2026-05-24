@@ -2,6 +2,7 @@
 # CGI API helpers for Keenetic-Split-DNS
 
 KSD_ETC="${KSD_ETC:-/opt/etc/keenetic-split-dns}"
+KSD_SHARE="${KSD_SHARE:-/opt/share/keenetic-split-dns}"
 CONFIG="${KSD_ETC}/config.yaml"
 TOKEN_FILE="${KSD_ETC}/token"
 LOG_FILE="${KSD_ETC}/apply.log"
@@ -81,7 +82,23 @@ api_status() {
   last_apply=""
   [ -f "$LOG_FILE" ] && last_apply="$(tail -1 "$LOG_FILE" 2>/dev/null | json_escape)"
 
-  api_send_json "200" "{\"ok\":true,\"smartdns\":{\"running\":${running},\"pid\":\"${pid}\"},\"domains\":${domains},\"lan_ip\":\"${lan}\",\"web_port\":${port},\"url\":\"http://${lan}:${port}\"}"
+  log_json="[]"
+  if [ -f "$LOG_FILE" ]; then
+    _tmp="$(mktemp /tmp/ksd-logs.XXXXXX)"
+    tail -5 "$LOG_FILE" 2>/dev/null > "$_tmp"
+    log_json="["
+    first=1
+    while IFS= read -r line; do
+      esc="$(printf '%s' "$line" | json_escape)"
+      [ "$first" -eq 1 ] || log_json="${log_json},"
+      first=0
+      log_json="${log_json}\"${esc}\""
+    done < "$_tmp"
+    log_json="${log_json}]"
+    rm -f "$_tmp"
+  fi
+
+  api_send_json "200" "{\"ok\":true,\"smartdns\":{\"running\":${running},\"pid\":\"${pid}\"},\"domains\":${domains},\"lan_ip\":\"${lan}\",\"web_port\":${port},\"url\":\"http://${lan}:${port}\",\"last_apply\":\"${last_apply}\",\"logs\":${log_json}}"
 }
 
 api_get_config_raw() {
@@ -118,8 +135,12 @@ api_save_config() {
 }
 
 api_reload() {
-  SCRIPT_DIR="$(CDPATH= cd -- "$(dirname "$0")" && pwd)"
-  if "$SCRIPT_DIR/apply.sh" >>"$LOG_FILE" 2>&1; then
+  APPLY="${KSD_SHARE}/scripts/apply.sh"
+  if [ ! -x "$APPLY" ]; then
+    api_send_json "500" '{"ok":false,"error":"apply.sh not found"}'
+    exit 0
+  fi
+  if "$APPLY" >>"$LOG_FILE" 2>&1; then
     ts="$(date '+%Y-%m-%d %H:%M:%S')"
     echo "${ts} reload OK" >>"$LOG_FILE"
     api_send_json "200" '{"ok":true,"message":"applied"}'
@@ -131,7 +152,8 @@ api_reload() {
 api_test_dns() {
   domain="${QUERY_STRING#*domain=}"
   domain="${domain%%&*}"
-  domain="$(printf '%s' "$domain" | sed 's/%\([0-9A-F][0-9A-F]\)/\\x\1/g' | xargs -0 printf '%b' 2>/dev/null || echo "$domain")"
+  # URL-decode (percent-encoding)
+  domain="$(printf '%s' "$domain" | sed 's/+/ /g; s/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g' | xargs printf '%b' 2>/dev/null || printf '%s' "$domain")"
   [ -n "$domain" ] || domain="vk.com"
   rtype="A"
   case "$QUERY_STRING" in
@@ -161,14 +183,21 @@ api_domains_list() {
     for f in "${KSD_ETC}"/domain-sets/*.txt; do
       [ -f "$f" ] || continue
       group="$(basename "$f" .txt)"
-      upstream="$(awk -v g="$group" '$0 ~ "^  " g ":$" {f=1} f && $0 ~ "upstream:" {print $2; exit}' "$CONFIG" 2>/dev/null)"
+  upstream="$(awk -v g="$group" '
+    $0 ~ "^  " g ":$" { in_g=1; next }
+    in_g && /^[^ #]/ { exit }
+    in_g && $0 ~ /^    upstream:/ { print $2; exit }
+  ' "$CONFIG" 2>/dev/null)"
       while IFS= read -r d || [ -n "$d" ]; do
         d="$(echo "$d" | tr -d '\r')"
         [ -z "$d" ] && continue
         case "$d" in \#*) continue ;; esac
         [ "$first" -eq 1 ] || echo -n ','
         first=0
-        printf '{"domain":"%s","group":"%s","upstream":"%s"}' "$d" "$group" "${upstream:-yandex-dot}"
+        de="$(printf '%s' "$d" | json_escape)"
+        ge="$(printf '%s' "$group" | json_escape)"
+        ue="$(printf '%s' "${upstream:-yandex-dot}" | json_escape)"
+        printf '{"domain":"%s","group":"%s","upstream":"%s"}' "$de" "$ge" "$ue"
       done < "$f"
     done
   fi

@@ -4,7 +4,7 @@
 server-name keenetic-split-dns
 log-level info
 cache-size 512
-cache-persist yes
+# cache-persist set by compile-config.sh
 prefetch-domain yes
 serve-expired yes
 dnsmasq-lease-file /var/lib/misc/dnsmasq.leases

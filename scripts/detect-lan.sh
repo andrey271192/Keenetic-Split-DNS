@@ -24,7 +24,7 @@ detect_lan_ip() {
 detect_isp_dns() {
   dns=""
   if command -v ndm >/dev/null 2>&1; then
-    dns="$(ndm -p show dns-proxy 2>/dev/null | awk '/server/ {print $3; exit}' | tr -d "'\")"
+    dns="$(ndm -p show dns-proxy 2>/dev/null | awk '/server/ {print $3; exit}' | tr -d "'\"")"
   fi
   if [ -z "$dns" ]; then
     dns="$(grep '^nameserver' /etc/resolv.conf 2>/dev/null | awk '{print $2}' | head -1)"

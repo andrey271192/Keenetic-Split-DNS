@@ -58,8 +58,9 @@ mkdir -p "$KSD_ETC" "$KSD_SHARE" "$KSD_VAR_LOG" "$KSD_VAR_RUN" \
   "${KSD_SHARE}/domain-sets"
 
 # --- copy files ---
-cp -f "$SRC_DIR/etc/config.yaml.example" "${KSD_ETC}/config.yaml" 2>/dev/null || true
-[ -f "${KSD_ETC}/config.yaml" ] || cp "$SRC_DIR/etc/config.yaml.example" "${KSD_ETC}/config.yaml"
+if [ ! -f "${KSD_ETC}/config.yaml" ]; then
+  cp "$SRC_DIR/etc/config.yaml.example" "${KSD_ETC}/config.yaml"
+fi
 
 cp -rf "$SRC_DIR/scripts/"* "${KSD_SHARE}/scripts/"
 cp -rf "$SRC_DIR/www/"* "${KSD_SHARE}/www/"
@@ -79,9 +80,12 @@ chmod +x "${KSD_SHARE}/scripts/"*.sh "${KSD_SHARE}/cgi-bin/api.cgi"
 DETECT="${KSD_SHARE}/scripts/detect-lan.sh"
 LAN_IP="$("$DETECT" lan 2>/dev/null || echo "192.168.1.1")"
 if grep -q 'lan_ip: "192.168.1.1"' "${KSD_ETC}/config.yaml" 2>/dev/null; then
-  sed -i "s/lan_ip: \"192.168.1.1\"/lan_ip: \"${LAN_IP}\"/" "${KSD_ETC}/config.yaml" 2>/dev/null \
-    || sed "s/lan_ip: \"192.168.1.1\"/lan_ip: \"${LAN_IP}\"/" "${KSD_ETC}/config.yaml" > "${KSD_ETC}/config.yaml.tmp" \
-    && mv "${KSD_ETC}/config.yaml.tmp" "${KSD_ETC}/config.yaml"
+  if sed -i "s/lan_ip: \"192.168.1.1\"/lan_ip: \"${LAN_IP}\"/" "${KSD_ETC}/config.yaml" 2>/dev/null; then
+    :
+  else
+    sed "s/lan_ip: \"192.168.1.1\"/lan_ip: \"${LAN_IP}\"/" "${KSD_ETC}/config.yaml" > "${KSD_ETC}/config.yaml.tmp" \
+      && mv "${KSD_ETC}/config.yaml.tmp" "${KSD_ETC}/config.yaml"
+  fi
 fi
 
 # --- API token ---
@@ -107,8 +111,12 @@ mkdir -p /opt/etc/ndm/netfilter.d
 cp -f "$SRC_DIR/etc/ndm/netfilter.d/010-keenetic-split-dns.sh" /opt/etc/ndm/netfilter.d/
 chmod +x /opt/etc/ndm/netfilter.d/010-keenetic-split-dns.sh
 
-# --- domain sets to etc ---
-cp -f "${KSD_SHARE}/domain-sets/"*.txt "${KSD_ETC}/domain-sets/" 2>/dev/null || true
+# --- domain sets to etc (seed defaults only) ---
+for _ds in "${KSD_SHARE}/domain-sets/"*.txt; do
+  [ -f "$_ds" ] || continue
+  _base="$(basename "$_ds")"
+  [ -f "${KSD_ETC}/domain-sets/${_base}" ] || cp -f "$_ds" "${KSD_ETC}/domain-sets/${_base}"
+done
 
 # --- compile & start ---
 export KSD_ETC KSD_SHARE

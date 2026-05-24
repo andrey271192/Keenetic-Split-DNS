@@ -86,7 +86,14 @@ LOG_Q="$(yaml_val log_queries)"
 
 # --- upstream servers ---
 list_upstream_ids() {
-  awk '/^upstreams:$/,/^[^ ]/ { if ($0 ~ /^  [a-zA-Z0-9_-]+:$/) { gsub(/:$/,"",$1); print substr($1,3) } }' "$CONFIG" | head -20
+  awk '
+    /^upstreams:$/ { in_s=1; next }
+    in_s && /^[^ #]/ { exit }
+    in_s && /^  [a-zA-Z0-9_-]+:$/ {
+      gsub(/:$/, "", $1)
+      print $1
+    }
+  ' "$CONFIG"
 }
 
 for uid in $(list_upstream_ids); do
@@ -119,7 +126,14 @@ echo "" >> "$OUT_SMART"
 
 # --- domain groups ---
 list_group_ids() {
-  awk '/^domain_groups:$/,/^[^ ]/ { if ($0 ~ /^  [a-zA-Z0-9_-]+:$/) { gsub(/:$/,"",$1); print substr($1,3) } }' "$CONFIG"
+  awk '
+    /^domain_groups:$/ { in_s=1; next }
+    in_s && /^[^ #]/ { exit }
+    in_s && /^  [a-zA-Z0-9_-]+:$/ {
+      gsub(/:$/, "", $1)
+      print $1
+    }
+  ' "$CONFIG"
 }
 
 for gid in $(list_group_ids); do

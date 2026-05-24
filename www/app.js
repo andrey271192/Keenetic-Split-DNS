@@ -66,6 +66,23 @@
     document.getElementById('stat-url').textContent = s.url || '—';
     document.getElementById('topbar-sub').textContent = s.url ? s.url.replace('http://', '') + ' · lighttpd + CGI' : 'Keenetic Split DNS';
     if (s.web_port) document.getElementById('sidebar-port').textContent = s.web_port;
+    const logEl = document.getElementById('log-container');
+    if (logEl) {
+      const lines = Array.isArray(s.logs) ? s.logs : [];
+      if (lines.length) {
+        logEl.innerHTML = lines
+          .map((msg) => {
+            const m = String(msg);
+            const time = m.match(/^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/);
+            return `<motion class="log-line"><span class="log-time">${esc(time ? time[1] : '—')}</span> ${esc(time ? m.slice(time[1].length).trim() : m)}</div>`;
+          })
+          .join('');
+      } else if (s.last_apply) {
+        logEl.innerHTML = `<motion class="log-line"><span class="log-time">—</span> ${esc(s.last_apply)}</motion>`;
+      } else {
+        logEl.innerHTML = '<div class="log-line"><span class="log-time">—</span> Журнал пуст — нажмите «Применить»</motion>';
+      }
+    }
   }
 
   async function refreshDomains() {
@@ -219,6 +236,11 @@
       localStorage.setItem(TOKEN_KEY, v);
       toast('Токен сохранён');
     }
+  });
+
+  document.getElementById('btn-add-upstream')?.addEventListener('click', () => {
+    toast('Профили upstream задаются в config.yaml → upstreams');
+    document.querySelector('.nav-item[data-tab="settings"]')?.click();
   });
 
   document.getElementById('btn-export-domains')?.addEventListener('click', () => {
