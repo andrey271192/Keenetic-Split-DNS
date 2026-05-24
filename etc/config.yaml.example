@@ -1,0 +1,41 @@
+# Keenetic-Split-DNS — основной конфиг
+# Копируется в /opt/etc/keenetic-split-dns/config.yaml при установке
+
+version: 1
+
+# IP роутера в LAN (веб-интерфейс и listen DNS)
+lan_ip: "192.168.1.1"
+web_port: 3200
+
+# SmartDNS: порт DNS (53 при opkg dns-override, иначе 6053)
+dns_port: 53
+dns_listen: "0.0.0.0"
+
+log_queries: true
+cache_ttl_max: 3600
+
+# Upstream по умолчанию для всех остальных доменов
+default_upstream: isp-default
+
+upstreams:
+  yandex-dot:
+    name: "Yandex DNS (DoT)"
+    type: dot
+    address: "77.88.8.8"
+    port: 853
+    sni: "common.dot.dns.yandex.net"
+    timeout: 5
+
+  isp-default:
+    name: "ISP / Keenetic DNS"
+    type: udp
+    # auto — detect-lan.sh / ndm: DNS провайдера или 127.0.0.1@53
+    address: "auto"
+    port: 53
+    timeout: 3
+
+domain_groups:
+  ru-services:
+    name: "RU-сервисы (Yandex, VK, Mail, OK)"
+    upstream: yandex-dot
+    domain_set: "ru-services.txt"

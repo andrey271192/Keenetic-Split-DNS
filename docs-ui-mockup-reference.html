@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DNS Split — Keenetic</title>
+  <style>
+    :root {
+      --accent: #f5a623;
+      --accent-dim: rgba(245, 166, 35, 0.15);
+      --bg: #0f1114;
+      --bg-elevated: #181b20;
+      --bg-card: #1e2229;
+      --border: #2a3038;
+      --text: #e8eaed;
+      --text-muted: #8b939e;
+      --success: #3dd68c;
+      --success-bg: rgba(61, 214, 140, 0.12);
+      --danger: #f07178;
+      --danger-bg: rgba(240, 113, 120, 0.12);
+      --warning: #f5a623;
+      --warning-bg: rgba(245, 166, 35, 0.12);
+      --info: #6cb6ff;
+      --info-bg: rgba(108, 182, 255, 0.12);
+      --shadow: 0 4px 24px rgba(0,0,0,0.4);
+      --radius: 10px;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --mono: "SF Mono", "Fira Code", "Cascadia Code", Consolas, monospace;
+    }
+    [data-theme="light"] {
+      --bg: #f4f5f7;
+      --bg-elevated: #ffffff;
+      --bg-card: #ffffff;
+      --border: #dde1e6;
+      --text: #1a1d21;
+      --text-muted: #5c6570;
+      --shadow: 0 4px 20px rgba(0,0,0,0.08);
+      --success-bg: rgba(34, 160, 107, 0.1);
+      --danger-bg: rgba(220, 53, 69, 0.1);
+      --warning-bg: rgba(245, 166, 35, 0.12);
+      --info-bg: rgba(13, 110, 253, 0.08);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .app { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 240px;
+      background: var(--bg-elevated);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+    .logo {
+      padding: 20px 18px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, var(--accent), #e07800);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    .logo h1 { font-size: 15px; font-weight: 600; }
+    .logo span { font-size: 11px; color: var(--text-muted); display: block; }
+    .nav { padding: 12px 8px; flex: 1; }
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      color: var(--text-muted);
+      font-size: 14px;
+      border: none;
+      background: none;
+      width: 100%;
+      text-align: left;
+      transition: all 0.15s;
+    }
+    .nav-item:hover { background: var(--accent-dim); color: var(--text); }
+    .nav-item.active { background: var(--accent-dim); color: var(--accent); font-weight: 500; }
+    .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; opacity: 0.85; }
+    .sidebar-footer {
+      padding: 14px 18px;
+      border-top: 1px solid var(--border);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+    .sidebar-footer code { font-family: var(--mono); font-size: 10px; color: var(--accent); }
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 24px;
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border);
+      gap: 16px;
+    }
+    .topbar-left h2 { font-size: 18px; font-weight: 600; }
+    .topbar-left p { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .topbar-actions { display: flex; align-items: center; gap: 10px; }
+    .content { padding: 24px; flex: 1; overflow-y: auto; }
+    .panel { display: none; animation: fadeIn 0.2s ease; }
+    .panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-card);
+      color: var(--text);
+      transition: all 0.15s;
+    }
+    .btn:hover { border-color: var(--text-muted); }
+    .btn-primary { background: var(--accent); border-color: var(--accent); color: #1a1d21; }
+    .btn-primary:hover { filter: brightness(1.08); }
+    .btn-success { background: var(--success); border-color: var(--success); color: #0a1a12; }
+    .btn-ghost { background: transparent; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-icon { padding: 8px; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .badge-running { background: var(--success-bg); color: var(--success); }
+    .badge-stopped { background: var(--danger-bg); color: var(--danger); }
+    .badge-dot::before {
+      content: "";
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: currentColor;
+    }
+    .badge-running.badge-dot::before { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .badge-policy { background: var(--info-bg); color: var(--info); font-size: 11px; text-transform: none; letter-spacing: 0; font-weight: 500; padding: 2px 8px; border-radius: 4px; }
+
+    .grid { display: grid; gap: 16px; }
+    .grid-4 { grid-template-columns: repeat(4, 1fr); }
+    .grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .grid-2 { grid-template-columns: repeat(2, 1fr); }
+    @media (max-width: 1100px) { .grid-4 { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 700px) { .grid-4, .grid-3, .grid-2 { grid-template-columns: 1fr; } .sidebar { display: none; } }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      box-shadow: var(--shadow);
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .card-header h3 { font-size: 14px; font-weight: 600; }
+    .stat-value { font-size: 28px; font-weight: 700; line-height: 1.2; }
+    .stat-label { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+    .stat-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+
+    .table-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: var(--bg-elevated); color: var(--text-muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--accent-dim); }
+    td code { font-family: var(--mono); font-size: 12px; color: var(--info); }
+    .row-actions { display: flex; gap: 4px; }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .search-box {
+      flex: 1;
+      min-width: 200px;
+      position: relative;
+    }
+    .search-box input {
+      width: 100%;
+      padding: 8px 12px 8px 36px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-elevated);
+      color: var(--text);
+      font-size: 13px;
+    }
+    .search-box input:focus { outline: none; border-color: var(--accent); }
+    .search-box svg { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 16px; height: 16px; color: var(--text-muted); }
+
+    .form-group { margin-bottom: 14px; }
+    .form-group label { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%;
+      padding: 9px 12px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-elevated);
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+    }
+    .form-group textarea { min-height: 100px; font-family: var(--mono); font-size: 12px; resize: vertical; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+    .test-result {
+      margin-top: 16px;
+      padding: 16px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      font-family: var(--mono);
+      font-size: 12px;
+      line-height: 1.7;
+      white-space: pre-wrap;
+    }
+    .test-result .ok { color: var(--success); }
+    .test-result .meta { color: var(--text-muted); }
+
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 100%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow);
+    }
+    .modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .modal-header h3 { font-size: 16px; }
+    .modal-body { padding: 18px; }
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      padding: 14px 18px;
+      border-top: 1px solid var(--border);
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 18px;
+      background: var(--bg-card);
+      border: 1px solid var(--success);
+      border-radius: 8px;
+      font-size: 13px;
+      box-shadow: var(--shadow);
+      display: none;
+      z-index: 200;
+      animation: slideUp 0.3s ease;
+    }
+    .toast.show { display: block; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } }
+
+    .apply-banner {
+      background: linear-gradient(90deg, var(--accent-dim), transparent);
+      border: 1px solid var(--accent);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+    .apply-banner p { font-size: 13px; }
+    .apply-banner strong { color: var(--accent); }
+
+    .theme-toggle { cursor: pointer; }
+    .split-layout { display: grid; grid-template-columns: 1fr 320px; gap: 16px; }
+    @media (max-width: 900px) { .split-layout { grid-template-columns: 1fr; } }
+
+    .log-line { font-family: var(--mono); font-size: 11px; color: var(--text-muted); padding: 4px 0; border-bottom: 1px solid var(--border); }
+    .log-line:last-child { border: none; }
+    .log-time { color: var(--accent); margin-right: 8px; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <h1>DNS Split</h1>
+          <span>SmartDNS · Keenetic</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-tab="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Обзор
+        </button>
+        <button class="nav-item" data-tab="domains">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          Домены
+        </button>
+        <button class="nav-item" data-tab="upstreams">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          Upstream
+        </button>
+        <button class="nav-item" data-tab="test">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Проверка
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+          Настройки
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <div>Конфиг: <code>/opt/etc/dns-split/</code></div>
+        <div style="margin-top:6px">Порт: <code>3200</code></div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2 id="page-title">Обзор</h2>
+          <p>192.168.1.1:3200 · lighttpd + CGI</p>
+        </div>
+        <div class="topbar-actions">
+          <span class="badge badge-running badge-dot">SmartDNS работает</span>
+          <button class="btn btn-icon theme-toggle" id="theme-btn" title="Тема">🌓</button>
+          <button class="btn btn-success" id="apply-top">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4-3-9s1.34-9 3-9"/></svg>
+            Применить
+          </button>
+        </div>
+      </header>
+
+      <div class="content">
+        <!-- DASHBOARD -->
+        <section class="panel active" id="panel-dashboard">
+          <div class="apply-banner">
+            <div>
+              <p><strong>3 изменения</strong> не применены — конфиг изменён 24.05.2026 14:32</p>
+              <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Последняя перезагрузка SmartDNS: 24.05.2026 12:15:03</p>
+            </div>
+            <button class="btn btn-primary" onclick="showToast('Конфиг применён, SmartDNS перезагружен')">Применить и перезагрузить</button>
+          </div>
+
+          <div class="grid grid-4" style="margin-bottom:20px">
+            <div class="card">
+              <div class="card-header">
+                <span class="stat-label">Статус</span>
+                <span class="stat-icon" style="background:var(--success-bg)">✓</span>
+              </div>
+              <div class="stat-value" style="font-size:18px;color:var(--success)">Работает</div>
+              <div class="stat-label">PID 1842 · uptime 2д 4ч</div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <span class="stat-label">Домены</span>
+                <span class="stat-icon" style="background:var(--info-bg)">🌐</span>
+              </div>
+              <div class="stat-value">19</div>
+              <div class="stat-label">2 группы политик</div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <span class="stat-label">Запросы / сутки</span>
+                <span class="stat-icon" style="background:var(--accent-dim)">📊</span>
+              </div>
+              <div class="stat-value">12.4k</div>
+              <div class="stat-label">кэш hit 78%</div>
+            </div>
+            <div class="card">
+              <div class="card-header">
+                <span class="stat-label">Upstream</span>
+                <span class="stat-icon" style="background:var(--warning-bg)">🔗</span>
+              </div>
+              <div class="stat-value">2</div>
+              <div class="stat-label">yandex-dot, isp-default</div>
+            </div>
+          </div>
+
+          <div class="grid grid-2">
+            <div class="card">
+              <div class="card-header"><h3>Группы доменов</h3></div>
+              <div class="table-wrap">
+                <table>
+                  <thead><tr><th>Группа</th><th>Политика</th><th>Доменов</th></tr></thead>
+                  <tbody>
+                    <tr><td><strong>yandex-ecosystem</strong></td><td><span class="badge-policy">yandex-dot</span></td><td>6</td></tr>
+                    <tr><td><strong>vk-mail-ok</strong></td><td><span class="badge-policy">yandex-dot</span></td><td>13</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3>Журнал</h3></div>
+              <div class="log-line"><span class="log-time">14:32:01</span> config.yaml изменён (domains +1)</div>
+              <div class="log-line"><span class="log-time">12:15:03</span> smartdns reload OK</div>
+              <div class="log-line"><span class="log-time">12:14:58</span> apply: 19 domains, 2 upstreams</div>
+              <div class="log-line"><span class="log-time">10:02:11</span> lookup test vk.com → 87.240.x.x (yandex-dot)</div>
+              <div class="log-line"><span class="log-time">09:41:00</span> lighttpd started :3200</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- DOMAINS -->
+        <section class="panel" id="panel-domains">
+          <div class="toolbar">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="search" placeholder="Поиск домена…" id="domain-search">
+            </div>
+            <button class="btn btn-primary" onclick="openModal('modal-domain')">+ Добавить домен</button>
+            <button class="btn" onclick="openModal('modal-import')">Импорт</button>
+            <button class="btn btn-ghost">Экспорт YAML</button>
+          </div>
+
+          <div class="split-layout">
+            <div class="card" style="padding:0;overflow:hidden">
+              <div class="table-wrap" style="border:none;border-radius:0">
+                <table id="domains-table">
+                  <thead>
+                    <tr>
+                      <th><input type="checkbox"></th>
+                      <th>Домен</th>
+                      <th>Группа</th>
+                      <th>Политика</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3>Массовый импорт</h3></div>
+              <div class="form-group">
+                <label>Один домен на строку</label>
+                <textarea readonly style="min-height:200px">yandex.ru
+ya.ru
+yandex.com
+yandex.net
+yastatic.net
+yandex.st
+mail.ru
+mail.com
+imgsmail.ru
+mycdn.me
+vk.com
+vk.me
+vkuservideo.net
+vkuseraudio.net
+userapi.com
+vk-cdn.net
+ok.ru
+odnoklassniki.ru
+okcdn.ru</textarea>
+              </div>
+              <button class="btn btn-primary" style="width:100%">Импортировать в группу</button>
+              <p class="hint" style="margin-top:10px">Дубликаты пропускаются. Политика наследуется от группы.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- UPSTREAMS -->
+        <section class="panel" id="panel-upstreams">
+          <div class="toolbar">
+            <button class="btn btn-primary" onclick="openModal('modal-upstream')">+ Профиль upstream</button>
+          </div>
+          <div class="card" style="padding:0;overflow:hidden">
+            <div class="table-wrap" style="border:none">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Тип</th>
+                    <th>Адрес</th>
+                    <th>SNI / Host</th>
+                    <th>Таймаут</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>yandex-dot</code></td>
+                    <td>DoT</td>
+                    <td><code>77.88.8.8:853</code></td>
+                    <td><code>common.dot.dns.yandex.net</code></td>
+                    <td>5 с</td>
+                    <td class="row-actions">
+                      <button class="btn btn-sm btn-ghost" onclick="openModal('modal-upstream')">✎</button>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td><code>isp-default</code></td>
+                    <td>UDP</td>
+                    <td><code>192.168.1.1:53</code></td>
+                    <td>—</td>
+                    <td>3 с</td>
+                    <td class="row-actions">
+                      <button class="btn btn-sm btn-ghost" onclick="openModal('modal-upstream')">✎</button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card" style="margin-top:16px">
+            <div class="card-header"><h3>yandex-dot — детали</h3></div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Протокол</label>
+                <input value="DNS over TLS (DoT)" readonly>
+              </div>
+              <div class="form-group">
+                <label>Bootstrap</label>
+                <input value="77.88.8.8" readonly>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>SNI (Server Name Indication)</label>
+              <input value="common.dot.dns.yandex.net" readonly>
+            </div>
+            <p class="hint">Используется для доменов Yandex, VK, Mail.ru, OK в split-DNS политике.</p>
+          </div>
+        </section>
+
+        <!-- TEST -->
+        <section class="panel" id="panel-test">
+          <div class="card">
+            <div class="card-header"><h3>Проверка DNS-запроса</h3></div>
+            <div class="toolbar" style="margin-bottom:0">
+              <div class="form-group" style="flex:1;margin:0">
+                <input type="text" id="test-domain" value="vk.com" placeholder="example.com">
+              </div>
+              <select id="test-type" style="padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--bg-elevated);color:var(--text)">
+                <option>A</option>
+                <option>AAAA</option>
+                <option>HTTPS</option>
+              </select>
+              <button class="btn btn-primary" id="run-test">Выполнить</button>
+            </div>
+            <div class="test-result" id="test-output" style="display:none"></div>
+            <div class="test-result" id="test-placeholder">
+<span class="meta"># Нажмите «Выполнить» для тестового запроса через SmartDNS
+# Маршрутизация определяется политикой split-DNS</span>
+            </div>
+          </div>
+          <div class="grid grid-3" style="margin-top:16px">
+            <div class="card">
+              <div class="stat-label">Быстрые тесты</div>
+              <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
+                <button class="btn btn-sm" onclick="quickTest('yandex.ru')">yandex.ru</button>
+                <button class="btn btn-sm" onclick="quickTest('vk.com')">vk.com</button>
+                <button class="btn btn-sm" onclick="quickTest('google.com')">google.com</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="stat-label">Ожидаемый upstream</div>
+              <div style="margin-top:8px;font-size:14px"><code>yandex-dot</code> для vk.com</div>
+            </div>
+            <div class="card">
+              <div class="stat-label">Время ответа</div>
+              <div class="stat-value" style="font-size:20px" id="test-latency">—</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- SETTINGS -->
+        <section class="panel" id="panel-settings">
+          <div class="apply-banner">
+            <div>
+              <p><strong>Применить конфигурацию</strong> — записать YAML и перезагрузить SmartDNS</p>
+              <p style="font-size:12px;color:var(--text-muted);margin-top:4px">Без применения изменения действуют только в редакторе</p>
+            </div>
+            <button class="btn btn-primary btn-lg" style="padding:12px 24px;font-size:14px" onclick="showToast('Конфиг применён, SmartDNS перезагружен')">
+              ⚡ Применить конфигурацию
+            </button>
+          </div>
+
+          <div class="grid grid-2">
+            <div class="card">
+              <div class="card-header"><h3>Сеть и доступ</h3></div>
+              <div class="form-group">
+                <label>Привязка (listen)</label>
+                <input value="192.168.1.1:3200" readonly>
+              </div>
+              <div class="form-group">
+                <label>LAN-интерфейс</label>
+                <select><option>br0 (Home)</option><option>br1 (Guest)</option></select>
+              </div>
+              <div class="form-group">
+                <label>Токен API / CGI</label>
+                <input type="password" value="••••••••••••••••">
+                <p class="hint">Заголовок X-DNS-Split-Token для CGI-запросов</p>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3>SmartDNS</h3></div>
+              <div class="form-group">
+                <label>Путь конфигурации</label>
+                <input value="/opt/etc/dns-split/config.yaml" readonly>
+              </div>
+              <div class="form-group">
+                <label>Кэш (TTL max)</label>
+                <input type="number" value="3600">
+              </div>
+              <div class="form-group">
+                <label>
+                  <input type="checkbox" checked> Логировать запросы в syslog
+                </label>
+              </div>
+              <button class="btn" style="margin-top:8px">Перезапустить SmartDNS</button>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top:16px">
+            <div class="card-header"><h3>Резервная копия</h3></div>
+            <div class="toolbar" style="margin:0">
+              <button class="btn">Скачать config.yaml</button>
+              <button class="btn">Восстановить из файла</button>
+              <button class="btn btn-ghost" style="color:var(--danger)">Сбросить к умолчанию</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Domain -->
+  <div class="modal-overlay" id="modal-domain">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Добавить домен</h3>
+        <button class="btn btn-icon btn-ghost" onclick="closeModal('modal-domain')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Домен</label>
+          <input placeholder="example.ru">
+        </div>
+        <div class="form-group">
+          <label>Группа</label>
+          <select>
+            <option>yandex-ecosystem</option>
+            <option>vk-mail-ok</option>
+            <option selected>vk-mail-ok</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Политика (upstream)</label>
+          <select>
+            <option>yandex-dot</option>
+            <option>isp-default</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-domain')">Отмена</button>
+        <button class="btn btn-primary" onclick="closeModal('modal-domain');showToast('Домен добавлен (не применён)')">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Import -->
+  <div class="modal-overlay" id="modal-import">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Импорт доменов</h3>
+        <button class="btn btn-icon btn-ghost" onclick="closeModal('modal-import')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Группа назначения</label>
+          <select><option>vk-mail-ok</option><option>yandex-ecosystem</option></select>
+        </div>
+        <div class="form-group">
+          <label>Список доменов</label>
+          <textarea placeholder="domain1.ru&#10;domain2.com"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-import')">Отмена</button>
+        <button class="btn btn-primary" onclick="closeModal('modal-import');showToast('Импортировано 5 доменов')">Импорт</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Upstream -->
+  <div class="modal-overlay" id="modal-upstream">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>Профиль upstream</h3>
+        <button class="btn btn-icon btn-ghost" onclick="closeModal('modal-upstream')">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-group">
+          <label>ID профиля</label>
+          <input value="yandex-dot">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Тип</label>
+            <select><option selected>DoT</option><option>DoH</option><option>UDP</option></select>
+          </div>
+          <div class="form-group">
+            <label>Порт</label>
+            <input value="853">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Адрес</label>
+          <input value="77.88.8.8">
+        </div>
+        <div class="form-group">
+          <label>SNI</label>
+          <input value="common.dot.dns.yandex.net">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-upstream')">Отмена</button>
+        <button class="btn btn-primary" onclick="closeModal('modal-upstream');showToast('Профиль сохранён')">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">✓ Готово</div>
+
+  <script>
+    const DOMAINS = [
+      { d: 'yandex.ru', g: 'yandex-ecosystem', p: 'yandex-dot' },
+      { d: 'ya.ru', g: 'yandex-ecosystem', p: 'yandex-dot' },
+      { d: 'yandex.com', g: 'yandex-ecosystem', p: 'yandex-dot' },
+      { d: 'yandex.net', g: 'yandex-ecosystem', p: 'yandex-dot' },
+      { d: 'yastatic.net', g: 'yandex-ecosystem', p: 'yandex-dot' },
+      { d: 'yandex.st', g: 'yandex-ecosystem', p: 'yandex-dot' },
+      { d: 'mail.ru', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'mail.com', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'imgsmail.ru', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'mycdn.me', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'vk.com', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'vk.me', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'vkuservideo.net', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'vkuseraudio.net', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'userapi.com', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'vk-cdn.net', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'ok.ru', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'odnoklassniki.ru', g: 'vk-mail-ok', p: 'yandex-dot' },
+      { d: 'okcdn.ru', g: 'vk-mail-ok', p: 'yandex-dot' },
+    ];
+
+    const TITLES = {
+      dashboard: 'Обзор',
+      domains: 'Домены',
+      upstreams: 'Upstream-профили',
+      test: 'Проверка DNS',
+      settings: 'Настройки',
+    };
+
+    function renderDomains(filter = '') {
+      const tbody = document.querySelector('#domains-table tbody');
+      const q = filter.toLowerCase();
+      tbody.innerHTML = DOMAINS
+        .filter(x => !q || x.d.includes(q))
+        .map(x => `<tr>
+          <td><input type="checkbox"></td>
+          <td><code>${x.d}</code></td>
+          <td>${x.g}</td>
+          <td><span class="badge-policy">${x.p}</span></td>
+          <td class="row-actions">
+            <button class="btn btn-sm btn-ghost">✎</button>
+            <button class="btn btn-sm btn-ghost">🗑</button>
+          </td>
+        </tr>`).join('');
+    }
+
+    document.querySelectorAll('.nav-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tab = btn.dataset.tab;
+        document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('panel-' + tab).classList.add('active');
+        document.getElementById('page-title').textContent = TITLES[tab];
+      });
+    });
+
+    document.getElementById('domain-search')?.addEventListener('input', e => renderDomains(e.target.value));
+    document.getElementById('theme-btn').addEventListener('click', () => {
+      const html = document.documentElement;
+      html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+    });
+
+    document.getElementById('apply-top').addEventListener('click', () => showToast('Конфиг применён, SmartDNS перезагружен'));
+
+    function openModal(id) { document.getElementById(id).classList.add('open'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+    document.querySelectorAll('.modal-overlay').forEach(el => {
+      el.addEventListener('click', e => { if (e.target === el) el.classList.remove('open'); });
+    });
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = '✓ ' + msg;
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 2800);
+    }
+
+    const TEST_DATA = {
+      'vk.com': { ip: '87.240.190.78', upstream: 'yandex-dot', ms: 24 },
+      'yandex.ru': { ip: '5.255.255.5', upstream: 'yandex-dot', ms: 18 },
+      'google.com': { ip: '142.250.185.78', upstream: 'isp-default', ms: 31 },
+    };
+
+    function runTest() {
+      const domain = document.getElementById('test-domain').value.trim() || 'vk.com';
+      const type = document.getElementById('test-type').value;
+      const data = TEST_DATA[domain] || { ip: '93.186.225.10', upstream: 'yandex-dot', ms: 42 };
+      document.getElementById('test-placeholder').style.display = 'none';
+      const out = document.getElementById('test-output');
+      out.style.display = 'block';
+      out.innerHTML = `<span class="ok">;; STATUS: NOERROR</span>
+<span class="meta">;; QUERY: ${domain} IN ${type}</span>
+<span class="meta">;; UPSTREAM: ${data.upstream} (DoT 77.88.8.8)</span>
+<span class="meta">;; POLICY: split-dns / group matched</span>
+
+${domain}.    300    IN    ${type}    ${data.ip}
+
+<span class="ok">;; Query time: ${data.ms} msec</span>
+<span class="meta">;; SERVER: 127.0.0.1#6053 (SmartDNS)</span>`;
+      document.getElementById('test-latency').textContent = data.ms + ' ms';
+    }
+
+    function quickTest(d) {
+      document.getElementById('test-domain').value = d;
+      runTest();
+    }
+
+    document.getElementById('run-test').addEventListener('click', runTest);
+    renderDomains();
+  </script>
+</body>
+</html>

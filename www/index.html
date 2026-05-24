@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Keenetic Split DNS</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="auth-gate" class="auth-gate">
+    <div class="card auth-card">
+      <div class="card-header"><h3>Токен API</h3></div>
+      <p class="hint" style="margin-bottom:12px">Токен из <code>/opt/etc/keenetic-split-dns/token</code> (показан при установке)</p>
+      <div class="form-group">
+        <label>Bearer token</label>
+        <input type="password" id="auth-token-input" placeholder="вставьте токен">
+      </div>
+      <button class="btn btn-primary" id="auth-save" style="width:100%">Войти</button>
+    </div>
+  </div>
+
+  <div class="app">
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">⚡</div>
+        <div>
+          <h1>Split DNS</h1>
+          <span>SmartDNS · Keenetic</span>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-tab="dashboard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          Обзор
+        </button>
+        <button class="nav-item" data-tab="upstreams">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4"/></svg>
+          Upstream
+        </button>
+        <button class="nav-item" data-tab="domains">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg>
+          Домены
+        </button>
+        <button class="nav-item" data-tab="test">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/></svg>
+          Проверка
+        </button>
+        <button class="nav-item" data-tab="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/></svg>
+          Настройки
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <div>Конфиг: <code>/opt/etc/keenetic-split-dns/</code></div>
+        <div style="margin-top:6px">Порт: <code id="sidebar-port">3200</code></div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <div class="topbar-left">
+          <h2 id="page-title">Обзор</h2>
+          <p id="topbar-sub">Загрузка…</p>
+        </div>
+        <div class="topbar-actions">
+          <span class="badge badge-running badge-dot" id="status-badge">SmartDNS</span>
+          <button class="btn btn-icon" id="theme-btn" title="Тема">🌓</button>
+          <button class="btn btn-success" id="apply-top">Применить</button>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="panel active" id="panel-dashboard">
+          <div class="grid grid-4" style="margin-bottom:20px">
+            <div class="card">
+              <div class="card-header"><span class="stat-label">Статус</span><span class="stat-icon" style="background:var(--success-bg)">✓</span></div>
+              <div class="stat-value" id="stat-status" style="font-size:18px">—</div>
+              <div class="stat-label" id="stat-pid">PID —</div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="stat-label">Домены</span><span class="stat-icon" style="background:var(--info-bg)">🌐</span></div>
+              <div class="stat-value" id="stat-domains">—</div>
+              <div class="stat-label">в списках split-DNS</div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="stat-label">Upstream</span><span class="stat-icon" style="background:var(--warning-bg)">🔗</span></div>
+              <div class="stat-value" id="stat-upstreams">—</div>
+              <div class="stat-label" id="stat-upstream-names">—</div>
+            </div>
+            <div class="card">
+              <div class="card-header"><span class="stat-label">Веб-UI</span><span class="stat-icon" style="background:var(--accent-dim)">🖥</span></div>
+              <div class="stat-value" style="font-size:16px" id="stat-url">—</div>
+              <div class="stat-label">только LAN</div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>Журнал</h3></div>
+            <div id="log-container"><div class="log-line"><span class="log-time">—</span> Загрузка…</div></div>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-upstreams">
+          <div class="toolbar">
+            <button class="btn btn-primary" id="btn-add-upstream">+ Профиль upstream</button>
+          </div>
+          <div class="master-detail">
+            <div class="card">
+              <div class="card-header"><h3>Профили</h3></div>
+              <ul class="upstream-list" id="upstream-list"></ul>
+            </div>
+            <div class="card" id="upstream-detail">
+              <div class="card-header"><h3 id="upstream-detail-title">Выберите профиль</h3></div>
+              <div id="upstream-detail-body"><p class="hint">Слева — upstream, справа — домены группы с этой политикой.</p></div>
+              <div class="table-wrap" style="margin-top:16px" id="upstream-domains-wrap">
+                <table><thead><tr><th>Домен</th><th>Группа</th></tr></thead><tbody id="upstream-domains-tbody"></tbody></table>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-domains">
+          <div class="toolbar">
+            <div class="search-box">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              <input type="search" placeholder="Поиск домена…" id="domain-search">
+            </div>
+            <button class="btn" id="btn-export-domains">Экспорт списка</button>
+          </div>
+          <div class="card" style="padding:0;overflow:hidden">
+            <div class="table-wrap" style="border:none">
+              <table id="domains-table">
+                <thead><tr><th>Домен</th><th>Группа</th><th>Upstream</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-test">
+          <div class="card">
+            <div class="card-header"><h3>Проверка DNS-запроса</h3></div>
+            <div class="toolbar" style="margin-bottom:0">
+              <div class="form-group" style="flex:1;margin:0">
+                <input type="text" id="test-domain" value="vk.com">
+              </div>
+              <select id="test-type">
+                <option>A</option>
+                <option>AAAA</option>
+              </select>
+              <button class="btn btn-primary" id="run-test">Выполнить</button>
+            </div>
+            <pre class="test-result" id="test-output"># Нажмите «Выполнить»</pre>
+          </div>
+          <div class="grid grid-3" style="margin-top:16px">
+            <div class="card">
+              <div class="stat-label">Быстрые тесты</div>
+              <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:6px">
+                <button class="btn btn-sm quick-test" data-d="yandex.ru">yandex.ru</button>
+                <button class="btn btn-sm quick-test" data-d="vk.com">vk.com</button>
+                <button class="btn btn-sm quick-test" data-d="google.com">google.com</button>
+              </div>
+            </div>
+            <div class="card">
+              <div class="stat-label">Время ответа</div>
+              <div class="stat-value" style="font-size:20px" id="test-latency">—</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel" id="panel-settings">
+          <div class="apply-banner">
+            <div>
+              <p><strong>Применить конфигурацию</strong> — YAML → SmartDNS + перезагрузка</p>
+            </div>
+            <button class="btn btn-primary" id="apply-settings">⚡ Применить</button>
+          </div>
+          <div class="grid grid-2">
+            <div class="card">
+              <div class="card-header"><h3>Токен API</h3></div>
+              <div class="form-group">
+                <label>Текущий токен (localStorage)</label>
+                <input type="password" id="settings-token">
+              </div>
+              <button class="btn" id="save-token">Сохранить токен</button>
+            </div>
+            <div class="card">
+              <div class="card-header"><h3>Конфиг YAML</h3></div>
+              <div class="form-group">
+                <textarea id="config-yaml" style="min-height:240px"></textarea>
+              </div>
+              <button class="btn btn-primary" id="save-config">Сохранить YAML</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">✓ Готово</div>
+  <script src="app.js"></script>
+</body>
+</html>

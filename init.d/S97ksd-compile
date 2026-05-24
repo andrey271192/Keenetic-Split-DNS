@@ -1,0 +1,17 @@
+#!/bin/sh
+# Keenetic-Split-DNS — compile config on boot
+
+KSD_ETC="/opt/etc/keenetic-split-dns"
+COMPILE="/opt/share/keenetic-split-dns/scripts/compile-config.sh"
+
+case "$1" in
+  start)
+    [ -x "$COMPILE" ] && [ -f "${KSD_ETC}/config.yaml" ] && "$COMPILE"
+    ;;
+  stop) ;;
+  restart)
+    "$0" stop
+    "$0" start
+    ;;
+esac
+exit 0
